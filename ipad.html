@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Number Guessing Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+  --bg:#111; --card:#1e1e1e; --text:#fff; --accent:#00ff99;
+}
+.light {
+  --bg:#f0f0f0; --card:#fff; --text:#111; --accent:#0077ff;
+}
+
+body {
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:Arial; text-align:center; padding:20px;
+}
+.game {
+  max-width:420px; margin:auto; background:var(--card);
+  padding:20px; border-radius:12px;
+}
+h2 { margin-top:0; }
+button, input, select {
+  width:100%; padding:10px; margin:6px 0; font-size:16px;
+}
+button {
+  background:var(--accent); color:#000; border:none; cursor:pointer;
+}
+button.secondary {
+  background:#555; color:#fff;
+}
+#message {
+  font-size:18px; margin-top:10px;
+}
+.badge {
+  display:inline-block; padding:4px 8px; margin:3px;
+  background:var(--accent); color:#000; border-radius:6px;
+  font-size:13px;
+}
+small { opacity:.8; }
+</style>
+</head>
+
+<body>
+
+<div class="game">
+  <h2>🎯 Ultimate Guessing Game</h2>
+
+  <button class="secondary" onclick="toggleTheme()">🌙 / ☀️ Theme</button>
+
+  <select id="mode" onchange="startGame()">
+    <option value="single">Single Player</option>
+    <option value="multi">2 Player Multiplayer</option>
+  </select>
+
+  <select id="difficulty" onchange="startGame()">
+    <option value="10">Easy (1–10)</option>
+    <option value="50" selected>Medium (1–50)</option>
+    <option value="100">Hard (1–100)</option>
+  </select>
+
+  <p id="turn"></p>
+
+  <input id="guess" type="number" placeholder="Enter your guess">
+  <button onclick="makeGuess()">Guess</button>
+  <button class="secondary" onclick="startGame()">Restart</button>
+
+  <p id="message"></p>
+  <p id="info"></p>
+
+  <div id="achievements"></div>
+  <small id="stats"></small>
+</div>
+
+<script>
+/* ===== SOUND ===== */
+const audio = new (window.AudioContext||window.webkitAudioContext)();
+function beep(f,d){
+  let o=audio.createOscillator(), g=audio.createGain();
+  o.frequency.value=f; o.connect(g); g.connect(audio.destination);
+  o.start(); g.gain.exponentialRampToValueAtTime(.0001,audio.currentTime+d);
+  o.stop(audio.currentTime+d);
+}
+
+/* ===== VOICE ===== */
+function speak(text){
+  let u = new SpeechSynthesisUtterance(text);
+  u.rate = 1; u.pitch = 1;
+  speechSynthesis.speak(u);
+}
+
+/* ===== STATE ===== */
+let number, max, tries, startTime;
+let mode="single", currentPlayer=1;
+let scores=[0,0];
+let level = Number(localStorage.getItem("level")||1);
+let achievements = JSON.parse(localStorage.getItem("ach")||"[]");
+
+/* ===== TAUNTS ===== */
+const taunts=["Too easy!","Try harder!","Wrong again!","Think!","Not even close!"];
+
+function startGame(){
+  mode = modeSel.value;
+  max = Number(difficulty.value) * level;
+  number = Math.floor(Math.random()*max)+1;
+  tries=0;
+  currentPlayer=1;
+  startTime=Date.now();
+  message.textContent=`Guess a number between 1 and ${max}`;
+  info.textContent="";
+  updateTurn();
+}
+
+function updateTurn(){
+  turn.textContent = mode==="multi" ? `Player ${currentPlayer}'s Turn` : "";
+}
+
+function makeGuess(){
+  let g = Number(guess.value);
+  if(!g) return;
+  tries++;
+
+  if(g===number){
+    beep(700,.2);
+    let time = Math.floor((Date.now()-startTime)/1000);
+    let winMsg = mode==="multi" ? `Player ${currentPlayer} wins!` : "You win!";
+    message.textContent = `🎉 ${winMsg}`;
+    speak(winMsg);
+    levelUp();
+    unlockAchievements(time);
+    saveProgress();
+  } else {
+    beep(300,.1);
+    let hint = g>number ? "Too high" : "Too low";
+    let t = taunts[Math.floor(Math.random()*taunts.length)];
+    message.textContent = `${hint}! ${t}`;
+    speak(t);
+    if(mode==="multi"){
+      currentPlayer = currentPlayer===1?2:1;
+      updateTurn();
+    }
+  }
+  guess.value="";
+  updateStats();
+}
+
+function levelUp(){
+  level++;
+  speak("Level up!");
+}
+
+function unlockAchievements(time){
+  if(tries<=3) addAch("Sharp Shooter");
+  if(time<=5) addAch("Speed Runner");
+  if(level>=5) addAch("Veteran");
+}
+
+function addAch(name){
+  if(!achievements.includes(name)){
+    achievements.push(name);
+    speak("Achievement unlocked " + name);
+  }
+}
+
+function updateStats(){
+  info.textContent=`Attempts: ${tries} | Level: ${level}`;
+  achievementsDiv.innerHTML = achievements.map(a=>`<span class="badge">${a}</span>`).join("");
+}
+
+function saveProgress(){
+  localStorage.setItem("level",level);
+  localStorage.setItem("ach",JSON.stringify(achievements));
+}
+
+/* ===== THEME ===== */
+function toggleTheme(){
+  document.body.classList.toggle("light");
+}
+
+/* ===== INIT ===== */
+const modeSel = document.getElementById("mode");
+const difficulty = document.getElementById("difficulty");
+const guess = document.getElementById("guess");
+const message = document.getElementById("message");
+const info = document.getElementById("info");
+const turn = document.getElementById("turn");
+const achievementsDiv = document.getElementById("achievements");
+const stats = document.getElementById("stats");
+
+guess.addEventListener("keydown",e=>{ if(e.key==="Enter") makeGuess(); });
+
+startGame();
+</script>
+
+</body>
+</html>
